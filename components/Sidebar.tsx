@@ -46,7 +46,7 @@ export function Sidebar() {
       <div className="mt-auto p-5">
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
-          className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm hover:bg-neutral-50"
+          className="w-full rounded-xl bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
         >
           Sign out
         </button>
