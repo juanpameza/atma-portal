@@ -18,11 +18,8 @@ type RatePlan = {
   delivery_rate_cents_per_kwh?: string;
 };
 
-export default function PlansPage() {
-  const params = useSearchParams();
-  const router = useRouter();
-
-  const zip = (params.get("zip") ?? "").trim();
+export default function PlansPage({ params }: { params: { zip: string } }) {
+  const zip = (params.zip ?? "").trim();
 
   const [eligibility, setEligibility] = useState<number | null>(null);
   const [utilities, setUtilities] = useState<Utility[]>([]);
