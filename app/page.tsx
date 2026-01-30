@@ -40,7 +40,7 @@ export default function HomePage() {
           </p>
         </div>
 
-        <form onSubmit={onSubmit} className="mt-8 space-y-4">
+        <form onSubmit={onSubmit} className="mt-8 space-y-4 text-neutral-700">
           <input
             inputMode="numeric"
             autoComplete="postal-code"
