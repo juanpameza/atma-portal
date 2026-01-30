@@ -67,6 +67,47 @@ function PlanBullets({ p }: { p: RatePlan }) {
   );
 }
 
+function PlanLinks({ links }: { links?: RatePlan["links"] }) {
+  if (!links) return null;
+
+  return (
+    <div className="mt-6 flex flex-wrap gap-4 text-sm">
+      {links.efl ? (
+        <a
+          href={links.efl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-neutral-900 underline underline-offset-4 hover:opacity-80"
+        >
+          EFL
+        </a>
+      ) : null}
+
+      {links.tos ? (
+        <a
+          href={links.tos}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-neutral-900 underline underline-offset-4 hover:opacity-80"
+        >
+          Terms of Service
+        </a>
+      ) : null}
+
+      {links.yrac ? (
+        <a
+          href={links.yrac}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-neutral-900 underline underline-offset-4 hover:opacity-80"
+        >
+          YRAC
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
 type Utility = { name: string; display_name?: string };
 type RatePlan = {
   uuid: string;
@@ -78,6 +119,11 @@ type RatePlan = {
   avg_cents_per_kwh_1000?: string;
   tdu_shortname?: string;
   delivery_rate_cents_per_kwh?: string;
+  links?: {
+    efl?: string;
+    tos?: string;
+    yrac?: string;
+  };
 };
 
 export default function PlansPage() {
@@ -286,6 +332,8 @@ export default function PlansPage() {
 
             {/* Bullet list with your variables */}
             <PlanBullets p={p} />
+
+            <PlanLinks links={p.links} />
 
             <button
               type="button"
