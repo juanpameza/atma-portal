@@ -1,3 +1,5 @@
+// This route loads Light's enrollment flow for customers enrolling from the portal.
+
 "use client";
 
 import { useEffect, useState } from "react";

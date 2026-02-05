@@ -1,3 +1,5 @@
+// This route checks eligibility for Light services based on postal code.
+
 import { NextResponse } from "next/server";
 
 const LIGHT_API_BASE = "https://api.light.dev";

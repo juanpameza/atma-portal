@@ -1,3 +1,5 @@
+// This page is rendered on the server side and uses Suspense to load the PlansClient component.
+
 import { Suspense } from "react";
 import PlansClient from "./PlansClient";
 

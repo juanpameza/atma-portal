@@ -1,3 +1,5 @@
+// This is the signup page to create a new account in the portal.
+
 "use client";
 
 import { useState } from "react";

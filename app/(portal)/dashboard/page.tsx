@@ -1,3 +1,6 @@
+// This is the dashboard page for the portal section of the app.
+// The only action available is the enroll button.
+
 "use client";
 import { useRouter } from "next/navigation";
 

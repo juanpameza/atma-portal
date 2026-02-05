@@ -1,3 +1,6 @@
+// This route generates an enrollment link for the authenticated user to enroll with Light.
+// This can used for users who already have an Atma Account.
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";

@@ -26,12 +26,26 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#fbf8f3] flex items-center justify-center px-6">
-      <div className="w-full max-w-lg rounded-3xl border border-neutral-200 bg-white p-10 shadow-sm">
-        <div className="text-center">
-          <div className="absolute top-6 left-100">
+    <div className="min-h-screen bg-[#fbf8f3] relative flex items-center justify-center px-6">
+      <div className="absolute left-6 top-6">
         <Logo />
       </div>
+      <div className="absolute right-6 top-6 flex items-center gap-3">
+        <Link
+          href="/login"
+          className="rounded-full border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-800 transition hover:border-neutral-400 hover:text-neutral-900"
+        >
+          Log in
+        </Link>
+        <Link
+          href="/signup"
+          className="rounded-full bg-neutral-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-neutral-800"
+        >
+          Sign up
+        </Link>
+      </div>
+      <div className="w-full max-w-lg rounded-3xl border border-neutral-200 bg-white p-10 shadow-sm">
+        <div className="text-center">
           <div className="text-3xl font-semibold tracking-tight text-neutral-900">
             Check plans in your area
           </div>

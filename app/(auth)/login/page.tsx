@@ -1,3 +1,5 @@
+// This is the login page to the portal.
+
 "use client";
 
 import { Suspense, useState } from "react";

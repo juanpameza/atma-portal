@@ -1,3 +1,5 @@
+// This route checks for available energy plans from Light's API
+
 import { NextResponse } from "next/server";
 
 const LIGHT_API_BASE = "https://api.light.dev";

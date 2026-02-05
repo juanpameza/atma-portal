@@ -1,23 +1,11 @@
+// This is the main client component for displaying and selecting energy buyback plans.
+
 "use client";
 
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
-
-function formatCentsPerKwh(v?: string) {
-  if (!v) return null;
-  const n = Number(v);
-  if (Number.isNaN(n)) return `${v}¢/kWh`;
-  return `${n.toFixed(2)}¢/kWh`;
-}
-
-function formatDollars(v?: string) {
-  if (!v) return null;
-  const n = Number(v);
-  if (Number.isNaN(n)) return `$${v}/mo`;
-  return `$${n.toFixed(2)}/mo`;
-}
 
 function fmt2(v?: string) {
   if (!v) return null;
@@ -25,6 +13,53 @@ function fmt2(v?: string) {
   if (Number.isNaN(n)) return v;
   return n.toFixed(2);
 }
+
+function FlowIframe({ url, onClose }: { url: string; onClose: () => void }) {
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const eventType = (event.data as any)?.type;
+      if (!eventType) return;
+
+      if (eventType === "light-flow-close") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[9999] bg-white">
+      <iframe
+        src={url}
+        title="Enrollment Flow"
+        className="h-screen w-screen border-0"
+        allow="clipboard-read; clipboard-write"
+      />
+    </div>
+  );
+}
+
+type Utility = { name: string; display_name?: string };
+
+type RatePlan = {
+  uuid: string;
+  group_uuid?: string; // IMPORTANT: we will use this for plan_group
+  name: string;
+  term_months: number;
+  energy_rate_cents_per_kwh?: string;
+  export_rate_cents_per_kwh?: string;
+  plan_monthly_cost_dollars?: string;
+  avg_cents_per_kwh_1000?: string;
+  tdu_shortname?: string;
+  delivery_rate_cents_per_kwh?: string;
+  links?: {
+    efl?: string;
+    tos?: string;
+    yrac?: string;
+  };
+};
 
 function PlanBullets({ p }: { p: RatePlan }) {
   return (
@@ -59,7 +94,8 @@ function PlanBullets({ p }: { p: RatePlan }) {
         <li className="flex gap-3">
           <span className="mt-2 h-1.5 w-1.5 rounded-full bg-neutral-900" />
           <span>
-            {p.tdu_shortname} Delivery Charges: {fmt2(p.delivery_rate_cents_per_kwh)}¢/kWh
+            {p.tdu_shortname} Delivery Charges:{" "}
+            {fmt2(p.delivery_rate_cents_per_kwh)}¢/kWh
           </span>
         </li>
       ) : null}
@@ -108,46 +144,39 @@ function PlanLinks({ links }: { links?: RatePlan["links"] }) {
   );
 }
 
-type Utility = { name: string; display_name?: string };
-type RatePlan = {
-  uuid: string;
-  name: string;
-  term_months: number;
-  energy_rate_cents_per_kwh?: string;
-  export_rate_cents_per_kwh?: string;
-  plan_monthly_cost_dollars?: string;
-  avg_cents_per_kwh_1000?: string;
-  tdu_shortname?: string;
-  delivery_rate_cents_per_kwh?: string;
-  links?: {
-    efl?: string;
-    tos?: string;
-    yrac?: string;
-  };
-};
-
-export default function PlansPage() {
+export default function PlansClient() {
   const params = useSearchParams();
-  const router = useRouter();
-
   const zip = (params.get("zip") ?? "").trim();
 
   const [eligibility, setEligibility] = useState<number | null>(null);
   const [utilities, setUtilities] = useState<Utility[]>([]);
   const [utility, setUtility] = useState<string>("");
+
   const [plans, setPlans] = useState<RatePlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const bestUtility = useMemo(() => utilities?.[0]?.name ?? "", [utilities]);
 
+  // Enrollment modal state
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [pendingPlanGroup, setPendingPlanGroup] = useState<string | null>(null);
+
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [infoError, setInfoError] = useState<string | null>(null);
+
+  const [enrollUrl, setEnrollUrl] = useState<string | null>(null);
+  const [startingEnroll, setStartingEnroll] = useState(false);
+
   useEffect(() => {
-  async function run() {
-    if (!zip) {
-      setError("Missing ZIP code.");
-      setLoading(false);
-      return;
-    }
+    async function run() {
+      if (!zip) {
+        setError("Missing ZIP code.");
+        setLoading(false);
+        return;
+      }
 
       setLoading(true);
       setError(null);
@@ -198,6 +227,74 @@ export default function PlansPage() {
     run();
   }, [zip]);
 
+  function onSelectPlan(p: RatePlan) {
+    const pg = (p.group_uuid ?? "").trim();
+    if (!pg) {
+      alert(
+        "This plan is missing group_uuid from Light. We need group_uuid to launch enrollment."
+      );
+      return;
+    }
+
+    setPendingPlanGroup(pg);
+    setInfoError(null);
+    setShowInfoModal(true);
+  }
+
+  async function submitContactAndStart() {
+    const plan_group = (pendingPlanGroup ?? "").trim();
+    const first_name = firstName.trim();
+    const last_name = lastName.trim();
+    const emailClean = email.trim().toLowerCase();
+
+    if (!plan_group) {
+      setInfoError("Missing plan group. Please try selecting the plan again.");
+      return;
+    }
+    if (!first_name || !last_name || !emailClean) {
+      setInfoError("Please enter first name, last name, and email.");
+      return;
+    }
+    if (!emailClean.includes("@")) {
+      setInfoError("Please enter a valid email.");
+      return;
+    }
+
+    setStartingEnroll(true);
+    setInfoError(null);
+
+    try {
+      const res = await fetch("/api/light/enroll/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          plan_group,
+          first_name,
+          last_name,
+          email: emailClean,
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        setInfoError(data?.error ?? "Could not start enrollment.");
+        return;
+      }
+
+      const link = String(data?.login_link ?? "");
+      if (!link) {
+        setInfoError("Enrollment link was not returned. Check server logs.");
+        return;
+      }
+
+      setShowInfoModal(false);
+      setEnrollUrl(link);
+    } finally {
+      setStartingEnroll(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#fbf8f3] flex items-center justify-center">
@@ -239,7 +336,8 @@ export default function PlansPage() {
               Not available in this ZIP yet
             </h1>
             <p className="mt-3 text-neutral-600">
-              This area doesn’t appear eligible for enrollment right now. Try a nearby ZIP code.
+              This area doesn’t appear eligible for enrollment right now. Try a
+              nearby ZIP code.
             </p>
             <Link
               href="/"
@@ -253,7 +351,6 @@ export default function PlansPage() {
     );
   }
 
-  // ✅ Replace your static cards with a map over `plans`
   return (
     <div className="min-h-screen bg-[#fbf8f3]">
       <header className="mx-auto max-w-6xl px-6 py-8 flex items-center justify-between">
@@ -270,83 +367,174 @@ export default function PlansPage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-6 pb-16">
-  <div className="text-center pt-4">
-    <h1 className="text-5xl font-semibold tracking-tight text-neutral-900">
-      Buyback plans <br /> for solar homes
-    </h1>
-    <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-neutral-600">
-      Plans shown are based on your ZIP and utility.
-    </p>
+        <div className="text-center pt-4">
+          <h1 className="text-5xl font-semibold tracking-tight text-neutral-900">
+            Buyback plans <br /> for solar homes
+          </h1>
+          <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-neutral-600">
+            Plans shown are based on your ZIP and utility.
+          </p>
 
-    <div className="mx-auto mt-4 text-sm text-neutral-600">
-      ZIP <span className="font-semibold">{zip}</span>
-      {bestUtility ? (
-        <>
-          {" "}
-          · Utility <span className="font-semibold">{bestUtility}</span>
-        </>
-      ) : null}
-    </div>
-  </div>
+          <div className="mx-auto mt-4 text-sm text-neutral-600">
+            ZIP <span className="font-semibold">{zip}</span>
+            {bestUtility ? (
+              <>
+                {" "}
+                · Utility <span className="font-semibold">{bestUtility}</span>
+              </>
+            ) : null}
+          </div>
+        </div>
 
-  {/* All plans */}
-  <div className="mt-14">
-    <div className="flex items-end justify-between gap-4">
-      <div>
-        <h3 className="text-xl font-semibold text-neutral-900">
-          All available plans
-        </h3>
-        <p className="mt-1 text-sm text-neutral-600">
-          Showing {plans.length} plan{plans.length === 1 ? "" : "s"}.
-        </p>
-      </div>
-
-      <Link
-        href="/"
-        className="text-sm font-semibold text-neutral-900 hover:opacity-80"
-      >
-        Change ZIP
-      </Link>
-    </div>
-
-    <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-2">
-      {plans.map((p, i) => {
-        const featured = i < 2;
-
-        return (
-          <div
-            key={p.uuid}
-            className={[
-              "rounded-3xl border bg-white p-7 shadow-sm",
-              featured ? "border-amber-200" : "border-neutral-200",
-            ].join(" ")}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div className="text-lg font-semibold text-neutral-900">{p.name}</div>
-              {featured ? (
-                <div className="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-neutral-900">
-                  Recommended
-                </div>
-              ) : null}
+        <div className="mt-14">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <h3 className="text-xl font-semibold text-neutral-900">
+                All available plans
+              </h3>
+              <p className="mt-1 text-sm text-neutral-600">
+                Showing {plans.length} plan{plans.length === 1 ? "" : "s"}.
+              </p>
             </div>
 
-            {/* Bullet list with your variables */}
-            <PlanBullets p={p} />
-
-            <PlanLinks links={p.links} />
-
-            <button
-              type="button"
-              className="mt-6 w-full rounded-2xl bg-neutral-900 py-3 text-sm font-semibold text-white transition hover:bg-neutral-800 active:scale-[0.99]"
+            <Link
+              href="/"
+              className="text-sm font-semibold text-neutral-900 hover:opacity-80"
             >
-              Select plan
-            </button>
+              Change ZIP
+            </Link>
           </div>
-        );
-      })}
-    </div>
-  </div>
-</main>
+
+          {/* 2 columns on sm+ */}
+          <div className="mt-6 grid gap-6 sm:grid-cols-2">
+            {plans.map((p, i) => {
+              const featured = i < 2;
+
+              return (
+                <div
+                  key={p.uuid}
+                  className={[
+                    "rounded-3xl border bg-white p-7 shadow-sm",
+                    featured ? "border-amber-200" : "border-neutral-200",
+                  ].join(" ")}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="text-lg font-semibold text-neutral-900">
+                      {p.name}
+                    </div>
+                    {featured ? (
+                      <div className="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-neutral-900">
+                        Recommended
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <PlanBullets p={p} />
+                  <PlanLinks links={p.links} />
+
+                  <button
+                    type="button"
+                    onClick={() => onSelectPlan(p)}
+                    className="mt-6 w-full rounded-2xl bg-neutral-900 py-3 text-sm font-semibold text-white transition hover:bg-neutral-800 active:scale-[0.99]"
+                  >
+                    Select plan
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </main>
+
+      {/* Contact info modal */}
+      {showInfoModal ? (
+        <div className="fixed inset-0 z-50 bg-black/50 p-4">
+          <div className="mx-auto w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow">
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <div className="text-lg font-semibold text-neutral-900">
+                Enter your info to continue
+              </div>
+              <button
+                onClick={() => setShowInfoModal(false)}
+                className="rounded-lg border px-3 py-1.5 hover:bg-neutral-50 text-neutral-600"
+                type="button"
+                disabled={startingEnroll}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="px-6 py-6">
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium text-neutral-700">
+                    First name
+                  </label>
+                  <input
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="h-12 rounded-2xl border border-neutral-200 px-4 outline-none focus:border-neutral-400 text-neutral-700"
+                    placeholder="Jane"
+                    autoComplete="given-name"
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium text-neutral-700">
+                    Last name
+                  </label>
+                  <input
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="h-12 rounded-2xl border border-neutral-200 px-4 outline-none focus:border-neutral-400 text-neutral-700"
+                    placeholder="Doe"
+                    autoComplete="family-name"
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium text-neutral-700">
+                    Email
+                  </label>
+                  <input
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="h-12 rounded-2xl border border-neutral-200 px-4 outline-none focus:border-neutral-400 text-neutral-700"
+                    placeholder="jane@company.com"
+                    autoComplete="email"
+                    inputMode="email"
+                  />
+                </div>
+
+                {infoError ? (
+                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {infoError}
+                  </div>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={submitContactAndStart}
+                  disabled={startingEnroll}
+                  className="mt-2 w-full rounded-2xl bg-neutral-900 py-4 text-base font-semibold text-white hover:bg-neutral-800 disabled:opacity-60"
+                >
+                  {startingEnroll ? "Starting…" : "Continue to enrollment"}
+                </button>
+
+                <p className="text-xs text-neutral-500">
+                  We use this info to start your enrollment.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Embedded enrollment iframe modal */}
+      {enrollUrl ? (
+  <FlowIframe url={enrollUrl} onClose={() => setEnrollUrl(null)} />
+) : null}
+
     </div>
   );
 }

@@ -1,3 +1,5 @@
+// This page is blank for now, to be implemented in the future.
+
 export default function Page() {
   return (
     <div className="max-w-5xl">

@@ -1,3 +1,5 @@
+// This is the layout for the portal section of the app.
+
 import { Sidebar } from "@/components/Sidebar";
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
